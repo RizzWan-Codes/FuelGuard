@@ -264,10 +264,32 @@ button:disabled {
   transition: all var(--transition);
 }
 
+svg {
+  display: inline-block;
+  vertical-align: middle;
+  flex-shrink: 0;
+}
+
 .drawer-link .link-icon {
-  font-size: 16px;
   width: 20px;
-  text-align: center;
+  height: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.drawer-link svg {
+  stroke: var(--ink-secondary);
+  transition: stroke var(--transition);
+}
+
+.drawer-link:hover svg {
+  stroke: var(--ink);
+}
+
+.drawer-link.active svg {
+  stroke: #ffffff;
 }
 
 .drawer-link .link-badge {
@@ -326,9 +348,11 @@ button:disabled {
 }
 
 .sfc-icon {
-  font-size: 20px;
-  margin-bottom: 6px;
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 8px;
+  color: #60a5fa;
 }
 
 .sfc-title {
@@ -621,7 +645,10 @@ main {
 }
 
 .alert-icon {
-  font-size: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
 }
 
 .alert-content strong {
@@ -669,8 +696,12 @@ main {
 }
 
 .metric-icon {
-  font-size: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   color: var(--primary);
+  width: 22px;
+  height: 22px;
 }
 
 .metric-value-row {
@@ -1591,8 +1622,17 @@ footer {
 }
 
 .cal-step-icon {
-  font-size: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   flex-shrink: 0;
+  color: var(--primary);
+  width: 44px;
+  height: 44px;
+  background: var(--primary-light);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-sm);
 }
 
 .cal-step-text p {

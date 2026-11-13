@@ -18,6 +18,7 @@ build/
 *.bak
 *~
 *.swp
+push_in_intervals.ps1
 
 # IDE & Editor Directories (Optional local state)
 .vscode/

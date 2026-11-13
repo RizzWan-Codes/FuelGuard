@@ -323,7 +323,7 @@ window.fuelGuardSim = {
     simState.ldrDigital = 1;
     
     browserLog(`Limit reached! : 345 (Threshold ${THRESHOLD} exceeded by water contamination)`, 'warn');
-    notify(`Limit reached! : 345 A0 counts. Water separation detected!`, 'Water Separation Alert ⚠️', true);
+    notify(`Limit reached! : 345 A0 counts. Water separation detected!`, 'Water Separation Alert', true);
 
     if (simState.mode === 'automatic') {
       simState.state = 'countdown';
@@ -400,7 +400,7 @@ function toggleDemoMode(forceState) {
     initDemoPoints();
     initDemoHistory();
     setLive(true);
-    toast('⚡ Demo Mode Enabled: Simulating ESP32 Telemetry');
+    toast('Demo Mode Enabled: Simulating ESP32 Telemetry');
   } else {
     toast('Hardware Mode: Connecting to physical ESP32 access point...');
   }
@@ -425,12 +425,13 @@ function updateDemoModeUI() {
   if (demoNotice) demoNotice.hidden = !demoMode;
 
   const conn = $('connection');
+  const connText = $('connText');
   if (conn) {
     if (demoMode) {
-      conn.textContent = '⚡ DEMO SIMULATOR';
+      if (connText) connText.textContent = 'DEMO SIMULATOR';
       conn.className = 'pill pill-demo';
     } else {
-      conn.textContent = live ? '● LIVE HARDWARE' : '● OFFLINE';
+      if (connText) connText.textContent = live ? 'LIVE HARDWARE' : 'OFFLINE';
       conn.className = 'pill' + (live ? ' pill-live' : ' bad');
     }
   }
@@ -590,7 +591,7 @@ function updateAuthUI() {
   
   if (isAuth) {
     $('authState').textContent = 'PIN 1335 verified. Manual motor control active for this session.';
-    $('openAuthModalBtn').textContent = 'PIN Verified ✓';
+    $('openAuthModalBtn').textContent = 'PIN Verified';
     $('openAuthModalBtn').classList.add('badge-teal');
   } else {
     $('authState').textContent = 'Manual motor override is optional. Requires Security PIN (1335).';
@@ -636,7 +637,7 @@ function renderStatus() {
     // Dispatch alert notification once every 12 seconds if limit is sustained
     if (Date.now() - lastLimitNotifiedAt > 12000) {
       lastLimitNotifiedAt = Date.now();
-      notify(`Limit reached! : ${s.raw} (Threshold ${THRESHOLD} exceeded)`, 'Limit Alert ⚠️', true);
+      notify(`Limit reached! : ${s.raw} (Threshold ${THRESHOLD} exceeded)`, 'Limit Alert', true);
     }
   } else {
     if ($('headline')) {
@@ -668,13 +669,13 @@ function renderStatus() {
   const heroTrend = $('heroTrendBadge');
   if (heroTrend) {
     if (isLimit) {
-      heroTrend.textContent = '⚠️ Phase Separation Spike';
+      heroTrend.textContent = 'Phase Separation Spike';
       heroTrend.className = 'trend-badge trend-down';
     } else if (s.raw < 50) {
       heroTrend.textContent = 'Chamber Empty (A0 < 50)';
       heroTrend.className = 'trend-badge trend-neutral';
     } else {
-      heroTrend.textContent = '● Nominal Petrol Phase';
+      heroTrend.textContent = 'Nominal Petrol Phase';
       heroTrend.className = 'trend-badge trend-up';
     }
   }
@@ -708,7 +709,7 @@ function renderStatus() {
   const ldrTrend = $('ldrTrendBadge');
   if (ldrTrend) {
     if (s.ldrDigital) {
-      ldrTrend.textContent = '⚠️ Aqueous Layer';
+      ldrTrend.textContent = 'Aqueous Layer';
       ldrTrend.className = 'trend-badge trend-down';
     } else {
       ldrTrend.textContent = 'D7 Sensor';
@@ -812,8 +813,8 @@ function renderStatus() {
   if (!$('calModal').hidden) {
     $('calModalLiveA0').textContent = s.raw + ' A0';
     $('calModalStability').textContent = s.raw < 50
-      ? '⚠️ Electrodes not submerged (A0 < 50)'
-      : '✓ Sensor submerged & communicating';
+      ? 'Electrodes not submerged (A0 < 50)'
+      : 'Sensor submerged & communicating';
     $('calModalStability').style.color = s.raw < 50 ? 'var(--coral)' : 'var(--teal-dark)';
   }
 
@@ -848,12 +849,12 @@ function updateReportPreview() {
   const waterOpt = summary.valid.some(p => p.ldr === 1);
   
   if (highA0 || waterOpt) {
-    $('pdfVehicleSafety').textContent = '⚠️ UNSAFE FOR VEHICLE';
+    $('pdfVehicleSafety').textContent = 'UNSAFE FOR VEHICLE';
     $('pdfVehicleSafety').style.color = 'var(--coral)';
     $('pdfPhaseStatus').textContent = 'Phase Separation Detected';
     $('pdfPhaseStatus').style.color = 'var(--coral)';
   } else if (summary.valid.length > 5) {
-    $('pdfVehicleSafety').textContent = '✓ WITHIN BENCH LIMITS';
+    $('pdfVehicleSafety').textContent = 'WITHIN BENCH LIMITS';
     $('pdfVehicleSafety').style.color = 'var(--teal-dark)';
     $('pdfPhaseStatus').textContent = 'Homogeneous Phase';
     $('pdfPhaseStatus').style.color = 'var(--teal-dark)';
@@ -1393,7 +1394,7 @@ async function triggerAppInstall() {
       await installPrompt.prompt();
       const outcome = await installPrompt.userChoice;
       if (outcome && outcome.outcome === 'accepted') {
-        toast('FuelGuard App installed successfully! 🎉');
+        toast('FuelGuard App installed successfully!');
         if ($('install')) $('install').hidden = true;
         closeDownloadModal();
       }
@@ -1581,8 +1582,8 @@ $('confirmStartCalBtn').onclick = () => {
       renderStatus();
 
       const successMsg = `Saved ${name} (E${ethanol}%) at Mean A0 ${mean.toFixed(1)} (±${sd.toFixed(2)})`;
-      $('calResult').textContent = `✓ ${successMsg}`;
-      notify(successMsg, 'Calibration Saved! ✓');
+      $('calResult').textContent = successMsg;
+      notify(successMsg, 'Calibration Saved');
     }
   }, 100);
 };
