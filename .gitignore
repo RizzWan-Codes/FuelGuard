@@ -1,0 +1,25 @@
+# Operating System Files
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+.DS_Store
+
+# Arduino & Compiler Outputs
+*.hex
+*.bin
+*.elf
+*.o
+*.a
+build/
+
+# Temporary / Scratch Files
+*.tmp
+*.bak
+*~
+*.swp
+
+# IDE & Editor Directories (Optional local state)
+.vscode/
+.idea/
+
