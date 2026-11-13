@@ -1,0 +1,971 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#f4f6fa">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="FuelGuard">
+  <meta name="description" content="FuelGuard Real-Time Telemetry & Phase Separation Monitor by IgnitionX. Designed by Rizwan Syed.">
+  <title>FuelGuard • Liquid Intelligence Console</title>
+  <link rel="icon" href="/logo.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/icon-192.png">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="stylesheet" href="/style.css">
+  <script defer src="/vendor/jspdf.umd.min.js"></script>
+  <script defer src="/vendor/report-font.js"></script>
+  <script defer src="/app.js"></script>
+</head>
+<body>
+
+  <!-- NAVIGATION DRAWER / SIDEBAR (Persistent on Desktop, Drawer on Mobile) -->
+  <div id="shade" hidden></div>
+  <nav id="drawer" aria-label="Main navigation">
+    <div class="drawer-header">
+      <a href="#overview" class="drawer-brand">
+        <img src="/logo.svg" alt="FuelGuard Logo" width="32" height="32">
+        <span>FUEL<span class="blue">GUARD</span></span>
+      </a>
+      <button id="closeMenu" class="drawer-close-btn" aria-label="Close navigation">&times;</button>
+    </div>
+    
+    <p class="eyebrow">NAVIGATION</p>
+    <div class="drawer-links">
+      <a href="#overview" class="drawer-link active">
+        <span class="link-icon">📊</span>
+        <span>Dashboard</span>
+      </a>
+      <a href="#signals" class="drawer-link">
+        <span class="link-icon">📈</span>
+        <span>Signals &amp; Graphs</span>
+      </a>
+      <a href="#control" class="drawer-link">
+        <span class="link-icon">⚡</span>
+        <span>Control Room</span>
+      </a>
+      <a href="#calibration" class="drawer-link">
+        <span class="link-icon">🧪</span>
+        <span>Calibration Lab</span>
+      </a>
+      <a href="#reports" class="drawer-link">
+        <span class="link-icon">📄</span>
+        <span>Report Studio</span>
+      </a>
+      <a href="#logs" class="drawer-link">
+        <span class="link-icon">📋</span>
+        <span>Event Journal</span>
+        <span id="navLogCount" class="link-badge">0</span>
+      </a>
+      <a href="#settings" class="drawer-link">
+        <span class="link-icon">⚙️</span>
+        <span>App &amp; Settings</span>
+      </a>
+    </div>
+
+    <!-- Download App button for mobile drawer -->
+    <button type="button" id="drawerDownloadAppBtn" class="download-app-btn w-100 mb-2" onclick="openDownloadModal()">
+      <span>⬇ Download App</span>
+    </button>
+
+    <!-- SIDEBAR FEATURE / DEMO MODE CARD (Matching Shopeers reference image) -->
+    <div class="sidebar-feature-card">
+      <span class="sfc-icon">⚡</span>
+      <div class="sfc-title" id="sfcTitle">Demo Mode Active</div>
+      <p class="sfc-desc" id="sfcDesc">Simulating live ESP32 telemetry, phase separation &amp; flush cycle.</p>
+      <button type="button" id="toggleDemoSidebarBtn" class="sfc-btn">Switch to Hardware</button>
+    </div>
+
+    <div class="drawer-footer">
+      <div>Made by <strong>IgnitionX</strong></div>
+      <div>Designed by <strong>Rizwan Syed</strong></div>
+    </div>
+  </nav>
+
+  <!-- TOP HEADER (Across main area) -->
+  <header>
+    <div class="header-left">
+      <button id="menu" class="hamburger-btn" aria-label="Open navigation menu" aria-expanded="false" aria-controls="drawer">
+        <span class="bar bar-1"></span>
+        <span class="bar bar-2"></span>
+        <span class="bar bar-3"></span>
+      </button>
+
+      <!-- Search bar matching Shopeers image -->
+      <div class="search-box">
+        <span class="search-icon">🔍</span>
+        <input type="text" id="globalSearch" class="search-input" placeholder="Search diagnostics, logs, or sensors... (Press /)">
+        <kbd class="search-kbd">⌘K</kbd>
+      </div>
+    </div>
+
+    <div class="header-actions">
+      <span id="connection" class="pill pill-demo">⚡ DEMO MODE</span>
+      <span id="modeHeaderBadge" class="pill mode-pill">AUTONOMOUS ESP</span>
+      <button type="button" id="headerDemoToggle" class="pill" title="Toggle between Demo Simulation and Real ESP32 Hardware">
+        <span>⚡ Mode:</span> <strong id="headerDemoText">Demo</strong>
+      </button>
+      <button id="downloadAppBtn" type="button" class="download-app-btn" title="Download FuelGuard App" onclick="openDownloadModal()">
+        <span>⬇ Download</span>
+      </button>
+      <button class="danger stop" title="Emergency Stop All Actuators">
+        <span>🛑 Stop Pumps</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- MAIN WORKSPACE -->
+  <main>
+    <!-- BANNERS -->
+    <div id="offline" class="banner danger-banner" hidden>
+      Connection lost to FuelGuard device. Telemetry is stale. Manual actuators are locked.
+    </div>
+
+    <div id="limitAlertBanner" class="banner alert-banner" hidden>
+      <span class="alert-icon">⚠️</span>
+      <div class="alert-content">
+        <strong id="limitAlertText">Limit reached! : 0</strong>
+        <span>Threshold of 275 A0 counts exceeded. Automated flush cycle initiated.</span>
+      </div>
+    </div>
+
+    <div id="demoNoticeBanner" class="banner demo-banner" hidden>
+      <span class="alert-icon">⚡</span>
+      <div class="alert-content">
+        <strong>Hackathon Showcase • Interactive Demo Simulator Active</strong>
+        <span>Telemetry is currently being generated. Click "Simulate Water Spike" to test automated phase purge.</span>
+      </div>
+    </div>
+
+    <!-- 01 / DASHBOARD (OVERVIEW) SECTION (Exact Shopeers Layout & Brutalism Design) -->
+    <section id="overview" class="page">
+      <!-- DASHBOARD HEADING -->
+      <div class="page-heading">
+        <div>
+          <p class="eyebrow">FUELGUARD / SENSOR WORKSPACE</p>
+          <h1>Dashboard</h1>
+          <p class="muted">Conductivity proxy, optical phase response, and automated protection.</p>
+        </div>
+        
+        <div class="header-controls">
+          <span class="date-range-pill" id="dashboardDatePill">📅 Live Stream &bull; 100ms</span>
+          <button type="button" id="triggerSpikeBtn" class="pill-action pill-spike" title="Simulate water contamination in chamber">
+            💧 Simulate Water Spike
+          </button>
+          <button type="button" id="restoreCleanBtn" class="pill-action pill-clean" title="Reset fuel to clean petrol baseline">
+            ⛽ Clean Petrol
+          </button>
+          <button type="button" id="overviewExportBtn" class="btn-primary export-btn" onclick="location.hash='#reports'">
+            ⬇ Export Report
+          </button>
+        </div>
+      </div>
+
+      <!-- ROW OF 4 METRIC CARDS (Exact match to the 4 cards at top of Shopeers image) -->
+      <div class="metrics">
+        <!-- Metric Card 1: Conductivity Proxy -->
+        <article class="metric-card" id="cardConductivity">
+          <div class="metric-header">
+            <p>Conductivity Proxy</p>
+            <span class="metric-icon">👁️</span>
+          </div>
+          <div class="metric-value-row">
+            <div class="metric-value">
+              <strong id="rawValue">98</strong><span class="denom"> / 1023</span>
+            </div>
+            <span class="trend-badge trend-up" id="condStatusTag">+0.4% Nominal</span>
+          </div>
+          <div class="meter"><i id="meter" style="width: 10%;"></i></div>
+          <small id="thresholdLabel">Action Threshold: &ge; 275 A0 counts</small>
+        </article>
+
+        <!-- Metric Card 2: Optical Refraction -->
+        <article class="metric-card">
+          <div class="metric-header">
+            <p>Optical Refraction</p>
+            <span class="metric-icon">💎</span>
+          </div>
+          <div class="metric-value-row">
+            <div class="metric-value">
+              <strong id="ldrValue">LOW · 0</strong>
+            </div>
+            <span class="trend-badge trend-neutral" id="ldrTrendBadge">D7 Sensor</span>
+          </div>
+          <div class="ldr-indicator">
+            <span id="ldrDot" class="status-dot"></span>
+            <span id="ldrPhaseText">Petrol-like phase</span>
+          </div>
+          <small id="ldrLabel">Digital optical refraction output</small>
+        </article>
+
+        <!-- Metric Card 3: Ethanol Percentage -->
+        <article class="metric-card">
+          <div class="metric-header">
+            <p>Approx. Ethanol %</p>
+            <span class="metric-icon">🧪</span>
+          </div>
+          <div class="metric-value-row">
+            <div class="metric-value">
+              <strong id="ethanolValue">10.2</strong><span class="denom"> %</span>
+            </div>
+            <span class="trend-badge trend-up" id="calTag">~E10 Approx</span>
+          </div>
+          <div class="ethanol-meter"><i id="ethanolMeter" style="width: 10%;"></i></div>
+          <small id="estimateHint">Piecewise monotonic curve</small>
+        </article>
+
+        <!-- Metric Card 4: Actuator Status -->
+        <article class="metric-card">
+          <div class="metric-header">
+            <p>Actuator Protection</p>
+            <span class="metric-icon">⚙️</span>
+          </div>
+          <div class="metric-value-row">
+            <div class="metric-value">
+              <strong id="pumpSummaryValue">Pumps Idle</strong>
+            </div>
+            <span class="trend-badge trend-neutral" id="pumpModeTag">ESP Auto</span>
+          </div>
+          <div class="pump-pills">
+            <span id="pump1" class="pump-badge">R1 (Flush): OFF</span>
+            <span id="pump2" class="pump-badge">R2 (Booster): OFF</span>
+          </div>
+          <small id="pumpRemaining">Both pumps idle</small>
+        </article>
+      </div>
+
+      <!-- MAIN DASHBOARD SPLIT: Left (Wide) & Right (Narrow) matching Shopeers image -->
+      <div class="dashboard-grid">
+        <!-- LEFT COLUMN: Hero Telemetry Graph + Diagnostic Rules Table -->
+        <div class="dash-left-col">
+          <!-- Hero Waveform Panel (matching "Total Profit $446.7K" card in image) -->
+          <article class="panel">
+            <div class="panel-heading">
+              <div>
+                <p class="eyebrow">LIVE TELEMETRY STREAM</p>
+                <h3>Synchronized Signal Telemetry</h3>
+              </div>
+              <div class="chart-tab-group">
+                <button type="button" class="tab-btn active" data-chart-tab="miniOverlay">Overlay</button>
+                <button type="button" class="tab-btn" data-chart-tab="miniConductivity">Conductivity</button>
+                <button type="button" class="tab-btn" data-chart-tab="miniLdr">Optical LDR</button>
+              </div>
+            </div>
+
+            <!-- Big Callout Metric inside Hero Card -->
+            <div class="chart-callout-row">
+              <span id="heroA0Display" class="chart-callout-value">98 A0 Counts</span>
+              <span id="heroTrendBadge" class="trend-badge trend-up">● Nominal Petrol Phase</span>
+              <span id="clock" class="muted" style="margin-left: auto; font-size: 11.5px; font-weight: 700;">—:—:—</span>
+            </div>
+
+            <div class="chart-wrapper">
+              <canvas id="miniChart" height="230"></canvas>
+              <div class="chart-tooltip" id="miniTooltip" hidden></div>
+            </div>
+
+            <div class="legend">
+              <span class="teal-dot">A0 Conductivity Counts (0–1023)</span>
+              <span class="amber-dot">Optical LDR (0 Petrol / 1 Water)</span>
+              <span class="coral-dot">Threshold Alarm (275)</span>
+            </div>
+
+            <!-- 3-Segment Fuel Phase Breakdown Bar (matching Customers in image) -->
+            <div class="phase-segments-card">
+              <div class="phase-segments-header">Fuel Phase Boundaries &amp; Thresholds:</div>
+              <div class="phase-segments-grid">
+                <div class="phase-seg-item seg-blue">
+                  <span class="phase-seg-label">Pure Petrol Zone</span>
+                  <span class="phase-seg-value">A0: 50 – 180</span>
+                </div>
+                <div class="phase-seg-item seg-green">
+                  <span class="phase-seg-label">Ethanol Blends</span>
+                  <span class="phase-seg-value">E10 – E85 Blends</span>
+                </div>
+                <div class="phase-seg-item seg-orange">
+                  <span class="phase-seg-label">Separation Alert</span>
+                  <span class="phase-seg-value">A0 &ge; 275 Counts</span>
+                </div>
+              </div>
+            </div>
+          </article>
+
+          <!-- Diagnostic Rules & Stream Analysis (matching "Best Selling Products" table in image) -->
+          <article class="panel">
+            <div class="panel-heading">
+              <div>
+                <h3>Real-Time Diagnostic Rules &amp; Sensor Health</h3>
+                <p class="muted">Automated failsafe triggers evaluated on every 100ms sample.</p>
+              </div>
+            </div>
+
+            <p id="conflict" class="diagnostic-summary">Live sensor telemetry coherent. Monitoring active.</p>
+
+            <div class="table-scroll">
+              <table>
+                <thead>
+                  <tr>
+                    <th style="width: 50px;">ID</th>
+                    <th>Rule / Sensor Diagnostic</th>
+                    <th>Trigger Condition</th>
+                    <th>Current State</th>
+                    <th>System Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td class="rule-id">#01</td>
+                    <td><strong>Sample Absence Detector</strong></td>
+                    <td>A0 &lt; 50 counts</td>
+                    <td><span class="badge badge-teal" id="diagRule1">Nominal</span></td>
+                    <td>Exclude from averages</td>
+                  </tr>
+                  <tr>
+                    <td class="rule-id">#02</td>
+                    <td><strong>High Conductivity Trigger</strong></td>
+                    <td>A0 &ge; 275 counts</td>
+                    <td><span class="badge badge-teal" id="diagRule2">Armed</span></td>
+                    <td>Auto-flush 3s countdown</td>
+                  </tr>
+                  <tr>
+                    <td class="rule-id">#03</td>
+                    <td><strong>Optical Phase Differentiation</strong></td>
+                    <td>Refraction: 0 Petrol / 1 Water</td>
+                    <td><span class="badge badge-teal" id="diagRule3">Petrol (0)</span></td>
+                    <td>Dual-sensor crosscheck</td>
+                  </tr>
+                  <tr>
+                    <td class="rule-id">#04</td>
+                    <td><strong>Ethanol Monotonic Curve</strong></td>
+                    <td>Piecewise interpolation</td>
+                    <td><span class="badge badge-teal" id="diagRule4">Active</span></td>
+                    <td>Approximate blend %</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </article>
+        </div>
+
+        <!-- RIGHT COLUMN: 3 Widgets matching the right side of the Shopeers image -->
+        <div class="dash-right-col">
+          <!-- Right Widget 1: Sensor Activity Bar Chart (matching "Most Day Active" in image) -->
+          <article class="panel">
+            <div class="panel-heading">
+              <div>
+                <h3>Observation Activity</h3>
+                <p class="muted">Recent sample density</p>
+              </div>
+              <strong id="activityCount" style="font-size: 16px; font-weight: 850;">1,240 Samples</strong>
+            </div>
+
+            <div class="activity-widget-bars">
+              <div class="bar-col">
+                <div class="bar-fill" style="height: 38%;"></div>
+                <span class="bar-label">12m</span>
+              </div>
+              <div class="bar-col">
+                <div class="bar-fill" style="height: 52%;"></div>
+                <span class="bar-label">10m</span>
+              </div>
+              <div class="bar-col active">
+                <div class="bar-fill" style="height: 88%;">
+                  <span class="bar-tooltip">Active</span>
+                </div>
+                <span class="bar-label">8m</span>
+              </div>
+              <div class="bar-col">
+                <div class="bar-fill" style="height: 44%;"></div>
+                <span class="bar-label">6m</span>
+              </div>
+              <div class="bar-col">
+                <div class="bar-fill" style="height: 28%;"></div>
+                <span class="bar-label">4m</span>
+              </div>
+              <div class="bar-col">
+                <div class="bar-fill" style="height: 60%;"></div>
+                <span class="bar-label">2m</span>
+              </div>
+              <div class="bar-col">
+                <div class="bar-fill" style="height: 75%;"></div>
+                <span class="bar-label">Now</span>
+              </div>
+            </div>
+          </article>
+
+          <!-- Right Widget 2: Fuel Purity Semi-Circular Radial Gauge (matching "Repeat Customer Rate 68%" in image) -->
+          <article class="panel">
+            <div class="panel-heading">
+              <div>
+                <h3>Fuel Integrity &amp; Purity</h3>
+                <p class="muted">Phase homogeneity index</p>
+              </div>
+            </div>
+
+            <div class="radial-gauge-container">
+              <svg viewBox="0 0 200 115" class="radial-gauge-svg">
+                <!-- Track -->
+                <path d="M 25 100 A 75 75 0 0 1 175 100" fill="none" stroke="#e2e8f0" stroke-width="12" stroke-linecap="round"/>
+                <!-- Value Arc -->
+                <path id="gaugePath" d="M 25 100 A 75 75 0 0 1 175 100" fill="none" stroke="#10b981" stroke-width="12" stroke-dasharray="235.6" stroke-dashoffset="10" stroke-linecap="round"/>
+                <!-- Tick marks -->
+                <circle cx="25" cy="100" r="2.5" fill="#0f172a"/>
+                <circle cx="100" cy="25" r="2.5" fill="#0f172a"/>
+                <circle cx="175" cy="100" r="2.5" fill="#0f172a"/>
+              </svg>
+              <div class="gauge-center-text">
+                <strong id="gaugePct">99.4%</strong>
+                <small>Purity Score</small>
+              </div>
+            </div>
+            <p id="gaugeStatusText" class="gauge-status-text">On track &bull; Zero phase separation</p>
+            <a href="#signals" class="gauge-link">Show full waveforms &rarr;</a>
+          </article>
+
+          <!-- Right Widget 3: Hackathon Demo & Assistant Hub (matching "AI Assistant" card in image) -->
+          <article class="assistant-widget">
+            <div class="panel-heading">
+              <div>
+                <p class="eyebrow">HACKATHON SHOWCASE</p>
+                <h3>Demo Simulator Hub</h3>
+              </div>
+              <span class="badge badge-teal">Live Control</span>
+            </div>
+
+            <div class="sphere-wrapper">
+              <div id="simulatorSphere" class="glowing-sphere" title="Radar telemetry orb"></div>
+            </div>
+
+            <div class="quick-sim-buttons">
+              <button type="button" class="sim-btn sim-btn-spike" onclick="window.fuelGuardSim.triggerSpike()">
+                💧 Simulate Water Spike (A0 &gt; 275)
+              </button>
+              <button type="button" class="sim-btn sim-btn-clean" onclick="window.fuelGuardSim.restoreClean()">
+                ⛽ Clean Fuel (A0 ~95)
+              </button>
+              <button type="button" class="sim-btn stop danger">
+                🛑 Emergency Stop Pumps
+              </button>
+            </div>
+
+            <form id="quickSimForm" class="quick-sim-form" onsubmit="event.preventDefault(); window.fuelGuardSim.runCommand();">
+              <input type="text" id="quickSimInput" placeholder="Quick PIN or command (e.g. 1335, /spike)..." autocomplete="off">
+              <button type="submit" class="quick-sim-send-btn">&rarr;</button>
+            </form>
+          </article>
+        </div>
+      </div>
+
+      <!-- Hidden elements preserved for JS compatibility -->
+      <div hidden>
+        <span id="modeBadge">PROGRAMMED AUTONOMOUS ESP</span>
+        <span id="stateBadge">MONITORING</span>
+        <h2 id="headline">Waiting for device telemetry...</h2>
+        <p id="decision">Connect to FuelGuard Wi-Fi access point to begin monitoring.</p>
+        <span id="sampleBadge">SAMPLE 001</span>
+        <span id="phaseState">PHASE: NORMAL</span>
+        <div id="orbitGauge"><span id="heroValue">—</span></div>
+      </div>
+    </section>
+
+    <!-- 02 / LIVE SIGNALS & GRAPHS SECTION -->
+    <section id="signals" class="page" hidden>
+      <div class="page-heading">
+        <div>
+          <p class="eyebrow">TELEMETRY &amp; GRAPH SUITE</p>
+          <h1>Multi-Signal Live Visualization</h1>
+          <p class="muted">High-resolution waveform telemetry with dual-axis overlay and event markers.</p>
+        </div>
+        <div class="signals-controls">
+          <label class="inline-select" style="margin: 0; display: inline-flex; align-items: center; gap: 8px;">
+            <span>Time Window:</span>
+            <select id="window" style="width: auto; margin-top: 0;">
+              <option value="30">Last 30 seconds</option>
+              <option value="60" selected>Last 60 seconds</option>
+              <option value="300">Last 5 minutes</option>
+              <option value="900">Last 15 minutes</option>
+              <option value="1800">Last 30 minutes</option>
+            </select>
+          </label>
+        </div>
+      </div>
+
+      <!-- DUAL-AXIS OVERLAY GRAPH -->
+      <article class="panel">
+        <div class="panel-heading">
+          <h3>Synchronized Signal Overlay <small>A0 Left Axis (0–1023) &bull; LDR Right Axis (0/1)</small></h3>
+          <span class="live-pill"><span class="pulse-dot"></span> LIVE STREAMING</span>
+        </div>
+        <div class="chart-wrapper">
+          <canvas id="overlayChart" height="260"></canvas>
+        </div>
+        <div class="legend">
+          <span class="teal-dot">Conductivity Proxy (A0)</span>
+          <span class="amber-dot">Optical Response (LDR D7)</span>
+          <span class="coral-dot">Threshold Alarm (275)</span>
+        </div>
+      </article>
+
+      <!-- TWO SIDE-BY-SIDE GRAPHS -->
+      <div class="grid two">
+        <article class="panel">
+          <div class="panel-heading">
+            <h3>Conductivity Proxy <small>Raw A0 Analog Counts</small></h3>
+            <span class="badge" id="condStatBadge">A0: —</span>
+          </div>
+          <div class="chart-wrapper">
+            <canvas id="conductivityChart" height="220"></canvas>
+          </div>
+          <p class="muted">100 ms hardware analog sampling. Red dashed marker indicates the 275 limit line.</p>
+        </article>
+
+        <article class="panel">
+          <div class="panel-heading">
+            <h3>Optical Response <small>Digital Refraction Output</small></h3>
+            <span class="badge" id="ldrStatBadge">LDR: —</span>
+          </div>
+          <div class="chart-wrapper">
+            <canvas id="ldrChart" height="220"></canvas>
+          </div>
+          <p class="muted">Debounced digital input: 0 indicates petrol phase; 1 indicates water-like separation.</p>
+        </article>
+      </div>
+    </section>
+
+    <!-- 03 / CONTROL ROOM -->
+    <section id="control" class="page" hidden>
+      <div class="page-heading">
+        <div>
+          <p class="eyebrow">CONTROL ROOM</p>
+          <h1>System Operation &amp; Actuators</h1>
+          <p class="muted">Autonomous ESP automation with PIN-protected manual motor override.</p>
+        </div>
+        <button class="danger stop">Stop All Pumps</button>
+      </div>
+
+      <div class="grid two">
+        <!-- MODE CONTROLLER & AUTH -->
+        <article class="panel">
+          <h3>System Automation &amp; Manual Override</h3>
+          <p id="authState" class="auth-message">Manual motor override is optional. Requires Security PIN.</p>
+          
+          <div class="mode-selector-card">
+            <div class="mode-option" id="modeOptAuto">
+              <div class="mode-header">
+                <strong>Programmed Autonomous ESP (Default)</strong>
+                <span class="badge badge-teal">Automatic</span>
+              </div>
+              <p>ESP handles all telemetry, countdowns, and automatic flushes on its own. No operator intervention required.</p>
+              <button type="button" id="autoMode" class="secondary" data-live>Active Autonomous Mode</button>
+            </div>
+
+            <div class="mode-option" id="modeOptManual">
+              <div class="mode-header">
+                <strong>Manual Motor Control (Optional Override)</strong>
+                <span class="badge badge-amber">Optional</span>
+              </div>
+              <p>Use this only if you want to turn the motors on and off yourself. Requires Security PIN.</p>
+              <div class="button-row">
+                <button type="button" id="manualMode" class="secondary" data-live>Enable Manual Motor Control</button>
+                <button type="button" id="openAuthModalBtn" class="pill">Enter PIN</button>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <!-- MANUAL PUMP CONTROLS -->
+        <article class="panel">
+          <h3>Manual Pump Actuators</h3>
+          <p class="muted">Only operational during authenticated Manual Override. Max safety limit: 60s.</p>
+
+          <label>Run Duration (Seconds):
+            <input id="manualSeconds" type="number" value="5" min="0.5" max="60" step="0.5">
+          </label>
+
+          <div class="pump-control-box">
+            <div class="pump-row">
+              <div class="pump-info">
+                <strong>01 / Removal Pump (R1)</strong>
+                <small>Flushes bottom separated phase out of chamber</small>
+              </div>
+              <div class="pump-btns">
+                <button id="r1On" class="btn-pump-on" data-live disabled>RUN R1</button>
+                <button class="stop danger">STOP</button>
+              </div>
+            </div>
+
+            <div class="pump-row">
+              <div class="pump-info">
+                <strong>02 / Booster Pump (R2)</strong>
+                <small>Dispenses additive/octane booster</small>
+              </div>
+              <div class="pump-btns">
+                <button id="r2On" class="btn-pump-on" data-live disabled>RUN R2</button>
+                <button class="stop danger">STOP</button>
+              </div>
+            </div>
+          </div>
+          <small class="muted" style="display: block; margin-top: 10px;">Built-in safety: only one pump runs at a time with automatic timeout cutoff.</small>
+        </article>
+      </div>
+
+      <!-- BOOSTER DOSE CALCULATOR -->
+      <article class="panel">
+        <h3>Calculated Booster Run (Pump R2)</h3>
+        <form id="doseForm" class="form-row">
+          <label>Sample Volume (mL)
+            <input name="petrolMl" type="number" min="1" max="10000" value="100" required>
+          </label>
+          <label>Specified Ratio (mL/L)
+            <input name="ratio" type="number" min="0.01" max="100" step="0.01" value="1.0" required>
+          </label>
+          <label>Pump Flow Rate (mL/s)
+            <input name="flow" type="number" min="0.01" max="1000" step="0.01" value="1.0" required>
+          </label>
+          <button data-live class="btn-accent">Run Timed Dose</button>
+        </form>
+        <p id="doseNote" class="muted">Calculates run time based on calibrated flow rate.</p>
+      </article>
+    </section>
+
+    <!-- 04 / CALIBRATION LAB -->
+    <section id="calibration" class="page" hidden>
+      <div class="page-heading">
+        <div>
+          <p class="eyebrow">CALIBRATION LAB</p>
+          <h1>Ethanol Reference Calibration</h1>
+          <p class="muted">Calibrate known blends (Sample A / E10, E20, E85) to approximate ethanol percentages.</p>
+        </div>
+      </div>
+
+      <div class="grid two">
+        <!-- CAPTURE WORKSTATION -->
+        <article class="panel">
+          <h3>Capture Reference Sample</h3>
+          <p>Select a preset or enter known blend details. You will be prompted to dip electrodes before recording.</p>
+
+          <div class="preset-buttons">
+            <span class="preset-label">Quick Presets:</span>
+            <button type="button" class="preset-btn" data-preset-name="Sample A (E10)" data-preset-eth="10">Sample A &bull; E10</button>
+            <button type="button" class="preset-btn" data-preset-name="Sample B (E20)" data-preset-eth="20">Sample B &bull; E20</button>
+            <button type="button" class="preset-btn" data-preset-name="Sample C (E85)" data-preset-eth="85">Sample C &bull; E85</button>
+          </div>
+
+          <form id="calForm">
+            <label>Sample Reference Name
+              <input id="calNameInput" name="name" maxlength="24" placeholder="e.g., Sample A" required>
+            </label>
+            <label>Known Ethanol (% by volume)
+              <input id="calEthanolInput" name="ethanol" type="number" min="0" max="100" step="0.1" placeholder="e.g., 10 for E10" required>
+            </label>
+            <div class="button-row">
+              <button type="button" id="startCalWizardBtn" class="btn-accent">Dip Electrodes &amp; Calibrate</button>
+              <button type="button" id="cancelCapture" class="secondary">Cancel Capture</button>
+            </div>
+          </form>
+
+          <div class="cal-status-box">
+            <div class="cal-progress-wrapper">
+              <div class="cal-progress-header">
+                <span>Capture Progress</span>
+                <span id="calProgressPct">0%</span>
+              </div>
+              <progress id="calProgress" max="100" value="0"></progress>
+            </div>
+            <p id="calResult" class="cal-result-text">Ready for reference sample.</p>
+          </div>
+        </article>
+
+        <!-- CALIBRATION PRINCIPLES -->
+        <article class="panel">
+          <h3>How Ethanol Approximation Works</h3>
+          <p>
+            FuelGuard records approximately 100 consecutive conductivity readings over 10 seconds. The mean count and standard deviation are calculated on the ESP. Unstable or aerated samples are rejected.
+          </p>
+          <p>
+            <strong>Piecewise Monotonic Interpolation:</strong> With 2 or more distinct reference points (e.g. Sample A at E10 and Sample B at E20), FuelGuard calculates the estimated ethanol fraction of new fuel samples.
+          </p>
+          <div class="rule" style="margin-top: 14px;">
+            <b>NOTE:</b>
+            <span>Electrode depth, spacing, temperature, and electrolyte additives influence conductivity. Always keep electrodes clean and steady during testing.</span>
+          </div>
+        </article>
+      </div>
+
+      <!-- SAVED REFERENCES TABLE -->
+      <article class="panel">
+        <div class="panel-heading">
+          <h3>Saved Reference Library</h3>
+          <span class="badge" id="calCountBadge">0 Points</span>
+        </div>
+        <div class="table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>Sample Name</th>
+                <th>Known Blend</th>
+                <th>Mean A0 Count</th>
+                <th>Std Dev</th>
+                <th>Sample Points</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="calRows">
+              <tr><td colspan="6">No reference samples saved yet.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </article>
+    </section>
+
+    <!-- 05 / REPORT STUDIO -->
+    <section id="reports" class="page" hidden>
+      <div class="page-heading">
+        <div>
+          <p class="eyebrow">REPORT STUDIO</p>
+          <h1>Craft Assessment Reports</h1>
+          <p class="muted">Generate professional PDF inspection reports with charts, diagnostics, and event logs.</p>
+        </div>
+      </div>
+
+      <article class="panel">
+        <form id="reportForm">
+          <div class="form-row">
+            <label>Report / Specimen Title
+              <input id="reportTitle" value="FuelGuard Fuel Assessment Report" maxlength="80">
+            </label>
+            <label>Inspector / Operator Name
+              <input id="reportOperator" placeholder="e.g. Rizwan Syed" maxlength="50">
+            </label>
+            <label>Data Scope
+              <select id="reportScope">
+                <option value="sample">Current Sample Only</option>
+                <option value="session" selected>Full Recording Session</option>
+              </select>
+            </label>
+          </div>
+
+          <label>Observations &amp; Vehicle Notes
+            <textarea id="reportNotes" maxlength="1500" placeholder="Record fuel source, vehicle model, ambient temperature, electrode cleanliness, and visual observations..."></textarea>
+          </label>
+
+          <!-- REPORT DIAGNOSTIC PREVIEW -->
+          <div class="report-diagnostic-preview">
+            <h4>Diagnostic Summary Included in PDF:</h4>
+            <div class="diag-preview-grid">
+              <div class="diag-preview-card">
+                <small>Average Conductivity (A0 &ge; 50):</small>
+                <strong id="pdfMeanA0">—</strong>
+              </div>
+              <div class="diag-preview-card">
+                <small>Estimated Ethanol Content:</small>
+                <strong id="pdfEstEthanol">— %</strong>
+              </div>
+              <div class="diag-preview-card">
+                <small>Vehicle Safety Check:</small>
+                <strong id="pdfVehicleSafety">Pending Data</strong>
+              </div>
+              <div class="diag-preview-card">
+                <small>Phase Separation Status:</small>
+                <strong id="pdfPhaseStatus">Pending Data</strong>
+              </div>
+              <div class="diag-preview-card">
+                <small>Ethanol Flushed Out:</small>
+                <strong id="pdfFlushStatus">Pending Data</strong>
+              </div>
+            </div>
+          </div>
+
+          <div class="button-row">
+            <button type="submit" class="btn-accent">Download PDF Report</button>
+            <button type="button" id="csvExport" class="secondary">Export CSV Data</button>
+            <button type="button" id="newRecording" class="secondary">Start New Session</button>
+          </div>
+        </form>
+        <p id="recordingInfo" class="muted">0 recorded observations.</p>
+      </article>
+    </section>
+
+    <!-- 06 / EVENT JOURNAL -->
+    <section id="logs" class="page" hidden>
+      <div class="page-heading">
+        <div>
+          <p class="eyebrow">EVENT JOURNAL</p>
+          <h1>Real-Time System Logs</h1>
+          <p class="muted">Chronological audit trail of pump operations, threshold events, modes, and sensor shifts.</p>
+        </div>
+        <div class="log-controls" style="display: flex; gap: 8px;">
+          <select id="logFilter" style="width: auto; margin-top: 0;">
+            <option value="all">All Events</option>
+            <option value="warn">Warnings &amp; Limits</option>
+            <option value="info">Information</option>
+            <option value="error">Errors</option>
+          </select>
+          <button type="button" id="clearLogsBtn" class="secondary">Clear View</button>
+        </div>
+      </div>
+
+      <article class="panel">
+        <div class="table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th style="width: 180px;">Time (Browser Clock)</th>
+                <th style="width: 100px;">Level</th>
+                <th style="width: 80px;">Sample</th>
+                <th>Event Description</th>
+              </tr>
+            </thead>
+            <tbody id="logRows">
+              <tr><td colspan="4">Listening for events...</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="muted">Hardware buffer preserves 64 events; browser memory maintains up to 1,000 chronological entries.</p>
+      </article>
+    </section>
+
+    <!-- 07 / SETTINGS & PWA -->
+    <section id="settings" class="page" hidden>
+      <div class="page-heading">
+        <div>
+          <p class="eyebrow">SETTINGS &amp; PWA</p>
+          <h1>Application Configuration</h1>
+          <p class="muted">Browser notification triggers, Progressive Web App installation, and safety parameters.</p>
+        </div>
+      </div>
+
+      <div class="grid two">
+        <article class="panel">
+          <h3>Progressive Web App &amp; Alerts</h3>
+          <p>Install FuelGuard to your home screen or desktop for a fullscreen native app experience.</p>
+          <div class="button-row">
+            <button id="install" class="btn-accent" hidden>Install FuelGuard PWA</button>
+            <button id="notifications">Enable Browser Notifications</button>
+          </div>
+          <p id="pwaStatus" class="pwa-status-text"></p>
+          <div class="rule" style="margin-top: 14px;">
+            <b>PWA Features:</b>
+            <span>Standalone display mode, instant offline shell caching, home screen shortcut icons, and push alert dispatch.</span>
+          </div>
+        </article>
+
+        <article class="panel">
+          <h3>Automatic Flush Cutoff</h3>
+          <form id="settingsForm">
+            <label>Maximum Flush Run Time (Seconds)
+              <input id="flushSeconds" type="number" value="30" min="1" max="60" step="1" required>
+            </label>
+            <button data-live class="btn-accent">Save Cutoff Parameter</button>
+          </form>
+          <p class="muted">A0 below 275 terminates the flush early. Reaching the timeout indicates an unrecovered sample fault.</p>
+        </article>
+      </div>
+    </section>
+
+    <!-- FOOTER WITH MANDATORY BRANDING TAG -->
+    <footer>
+      <div class="footer-brand">
+        <img src="/logo.svg" alt="" width="20" height="20">
+        <span>FUELGUARD &bull; LIQUID INTELLIGENCE CONSOLE</span>
+      </div>
+      <div class="footer-credits">
+        <span>Made by <strong>IgnitionX</strong></span>
+        <span>&bull;</span>
+        <span>Designed by <strong>Rizwan Syed</strong></span>
+      </div>
+    </footer>
+  </main>
+
+  <!-- MODAL: CALIBRATION DIPPING WIZARD -->
+  <div id="calModal" class="modal-backdrop" hidden style="display: none;">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <div>
+          <p class="eyebrow">STEP-BY-STEP CALIBRATION</p>
+          <h3 id="calModalTitle">Dip Electrodes into Reference Sample</h3>
+        </div>
+        <button type="button" class="modal-close" id="closeCalModal" aria-label="Close dialog">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="cal-instructions">
+          <div class="cal-step-icon">🧪</div>
+          <div class="cal-step-text">
+            <p id="calModalSampleDesc">Sample: <strong>Sample A (E10)</strong></p>
+            <p>1. Dip the two probe electrodes fully into the sample container.</p>
+            <p>2. Keep the electrodes completely still to prevent bubble disturbance.</p>
+            <p>3. Confirm live conductivity reading is steady before starting the 10-second capture.</p>
+          </div>
+        </div>
+
+        <div class="modal-live-readout">
+          <span>Live Conductivity Proxy:</span>
+          <strong id="calModalLiveA0">— A0</strong>
+          <small id="calModalStability">Checking sensor contact...</small>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" id="confirmStartCalBtn" class="btn-accent">Dip Confirmed — Start 10s Capture</button>
+        <button type="button" id="cancelCalModalBtn" class="secondary">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: AUTHENTICATION (PIN PROMPT FOR MANUAL OVERRIDE) -->
+  <div id="authModal" class="modal-backdrop" hidden style="display: none;">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <div>
+          <p class="eyebrow">SECURITY ACCESS</p>
+          <h3>Manual Motor Override PIN</h3>
+        </div>
+        <button type="button" class="modal-close" id="closeAuthModal" aria-label="Close dialog">&times;</button>
+      </div>
+      <form id="authModalForm">
+        <div class="modal-body">
+          <p>Enter the 4-digit Security PIN to control pump actuators manually.</p>
+          <label>Security PIN
+            <input type="password" id="modalPasswordInput" placeholder="••••" autocomplete="off" inputmode="numeric" maxlength="8" required>
+          </label>
+          <small class="muted">Enables manual pump operation for this session. (Default PIN: 1335)</small>
+        </div>
+        <div class="modal-footer">
+          <button type="submit" class="btn-accent">Unlock Motors</button>
+          <button type="button" id="cancelAuthModalBtn" class="secondary">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: DOWNLOAD / INSTALL APP -->
+  <div id="downloadModal" class="modal-backdrop" style="display: none;">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <div>
+          <p class="eyebrow">PWA INSTALLATION</p>
+          <h3>Download &amp; Install FuelGuard App</h3>
+        </div>
+        <button type="button" class="modal-close" id="closeDownloadModal" aria-label="Close dialog" onclick="closeDownloadModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="cal-instructions">
+          <div class="cal-step-icon">📱</div>
+          <div class="cal-step-text">
+            <p><strong>Add FuelGuard to your Home Screen or Desktop:</strong></p>
+            <p>&bull; <strong>Chrome / Android / Edge:</strong> Click <strong>"Install FuelGuard PWA"</strong> below, or click the install icon <strong>[⊕]</strong> in your browser address bar.</p>
+            <p>&bull; <strong>iPhone / iPad (Safari):</strong> Tap the <strong>Share</strong> button [↑] at the bottom of Safari, scroll down, and tap <strong>"Add to Home Screen"</strong>.</p>
+            <p>&bull; <strong>Offline Console:</strong> Enjoy fullscreen view, instant offline caching, and fast live telemetry right from your app drawer.</p>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" id="modalInstallTriggerBtn" class="btn-accent" onclick="triggerAppInstall()">Install FuelGuard PWA</button>
+        <button type="button" id="closeDownloadModalBtn" class="secondary" onclick="closeDownloadModal()">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- TOAST NOTIFICATION CONTAINER -->
+  <div id="toasts" role="status" aria-live="polite"></div>
+</body>
+</html>
