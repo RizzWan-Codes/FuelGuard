@@ -161,18 +161,19 @@ Ethanol-gasoline blends and aqueous slugs exhibit distinct refractive indices ($
 ```mermaid
 flowchart TD
     WELCOME["WELCOME<br/>Boot and Self-Test"] -->|"Hardware Normal"| EMPTY["EMPTY<br/>Tank Sump Dry"]
-    WELCOME -->|"Hardware Error"| FAULT["FAULT<br/>System Safety Lockout"]
     EMPTY -->|"Fluid Immersed"| MONITOR["MONITOR<br/>10 Hz Active Sampling"]
-    MONITOR -->|"Probes De-wetted"| EMPTY
-    MONITOR -->|"High Conductivity Detected"| COUNTDOWN["COUNTDOWN<br/>Hysteresis Window"]
-    COUNTDOWN -->|"Transient Spike Filtered"| MONITOR
-    COUNTDOWN -->|"Contamination Confirmed"| FLUSHING["FLUSHING<br/>Scavenge Pump Active"]
-    FLUSHING -->|"30-Second Lease Exceeded"| FAULT
+    MONITOR -->|"High Conductivity"| COUNTDOWN["COUNTDOWN<br/>Hysteresis Window"]
+    COUNTDOWN -->|"Trip Confirmed"| FLUSHING["FLUSHING<br/>Scavenge Pump Active"]
     FLUSHING -->|"Sump Purged Clear"| FLUSH_DONE["FLUSH_DONE<br/>Stabilization Verification"]
-    FLUSH_DONE --> MONITOR
-    MONITOR -->|"Manual Stop Command"| STOPPED["STOPPED<br/>Actuators Force-Disabled"]
-    FLUSHING -->|"Emergency Stop Triggered"| STOPPED
-    STOPPED -->|"Authenticated Release"| MONITOR
+    FLUSH_DONE -->|"Return to Normal"| MONITOR
+
+    subgraph Overrides ["Manual Override and Safety Lockout"]
+        STOPPED["STOPPED<br/>Actuators Force-Disabled"]
+        FAULT["FAULT<br/>System Safety Lockout"]
+    end
+
+    MONITOR <-->|"Manual Stop / Resume"| STOPPED
+    FLUSHING -->|"Safety Timeout (>30s)"| FAULT
 
     style WELCOME fill:#3730A3,stroke:#818CF8,stroke-width:2px,color:#FFFFFF
     style EMPTY fill:#334155,stroke:#94A3B8,stroke-width:2px,color:#FFFFFF
@@ -182,6 +183,7 @@ flowchart TD
     style FLUSH_DONE fill:#0F766E,stroke:#2DD4BF,stroke-width:2px,color:#FFFFFF
     style STOPPED fill:#581C87,stroke:#C084FC,stroke-width:2px,color:#FFFFFF
     style FAULT fill:#881337,stroke:#FB7185,stroke-width:2px,color:#FFFFFF
+    style Overrides fill:#0f172a,stroke:#334155,stroke-width:1px,color:#94a3b8
 ```
 
 ### State Behavior Matrix
