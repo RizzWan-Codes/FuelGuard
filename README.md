@@ -77,6 +77,15 @@ flowchart TD
     E -->|"Both Confirm Stratification"| F["Trigger 8-State FSM State Change"]
     E -->|"Single Anomaly Detected"| G["Noise Filter and False Alarm Suppression"]
     F --> H["Engage Closed-Loop Scavenge Purge and Remediation"]
+
+    style A fill:#1E293B,stroke:#38BDF8,stroke-width:2px,color:#FFFFFF
+    style B fill:#0F766E,stroke:#2DD4BF,stroke-width:2px,color:#FFFFFF
+    style C fill:#1E40AF,stroke:#60A5FA,stroke-width:2px,color:#FFFFFF
+    style D fill:#6B21A8,stroke:#C084FC,stroke-width:2px,color:#FFFFFF
+    style E fill:#B45309,stroke:#FBBF24,stroke-width:2px,color:#FFFFFF
+    style F fill:#B91C1C,stroke:#F87171,stroke-width:2px,color:#FFFFFF
+    style G fill:#334155,stroke:#94A3B8,stroke-width:2px,color:#FFFFFF
+    style H fill:#047857,stroke:#34D399,stroke-width:2px,color:#FFFFFF
 ```
 
 ### 1. Pulsed AC Anti-Electrolysis Conductivity Transducer
@@ -164,6 +173,15 @@ flowchart TD
     MONITOR -->|"Manual Stop Command"| STOPPED["STOPPED<br/>Actuators Force-Disabled"]
     FLUSHING -->|"Emergency Stop Triggered"| STOPPED
     STOPPED -->|"Authenticated Release"| MONITOR
+
+    style WELCOME fill:#3730A3,stroke:#818CF8,stroke-width:2px,color:#FFFFFF
+    style EMPTY fill:#334155,stroke:#94A3B8,stroke-width:2px,color:#FFFFFF
+    style MONITOR fill:#065F46,stroke:#34D399,stroke-width:2px,color:#FFFFFF
+    style COUNTDOWN fill:#92400E,stroke:#FBBF24,stroke-width:2px,color:#FFFFFF
+    style FLUSHING fill:#991B1B,stroke:#F87171,stroke-width:2px,color:#FFFFFF
+    style FLUSH_DONE fill:#0F766E,stroke:#2DD4BF,stroke-width:2px,color:#FFFFFF
+    style STOPPED fill:#581C87,stroke:#C084FC,stroke-width:2px,color:#FFFFFF
+    style FAULT fill:#881337,stroke:#FB7185,stroke-width:2px,color:#FFFFFF
 ```
 
 ### State Behavior Matrix
