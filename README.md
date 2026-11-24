@@ -2,30 +2,92 @@
 
 > Autonomous Dual-Sensing Fuel Quality Monitoring, Phase Separation Detection, and Closed-Loop Remediation System for Ethanol-Blended Gasoline.
 
----
-
-## Overview
-
-Modern commercial automotive fuels commonly utilize ethanol-gasoline blends (such as E10 and E20). Due to ethanol's hygroscopic properties, fuel stored in atmospheric or vented tanks naturally absorbs moisture. When water contamination exceeds the critical thermodynamic water tolerance boundary, the blend undergoes macroscopic liquid-liquid phase separation. 
-
-This separation produces two distinct fluid layers:
-1. An upper, octane-depleted hydrocarbon layer.
-2. A dense, corrosive aqueous ethanol-water layer that settles at the tank bottom.
-
-If ingested by the high-pressure fuel delivery pump, this aqueous layer causes immediate lean misfires, cavitation, mechanical pump seizure, and injector corrosion.
-
-**FuelGuard** provides continuous, real-time in-tank monitoring to detect phase separation before contaminated fuel reaches critical powertrain components. Utilizing an orthogonal dual-transducer sensing design coupled with an embedded fail-safe controller, the system autonomously triggers active scavenging and stabilizer remediation.
+[![GenHacks 2026](https://img.shields.io/badge/GenHacks_2026-Robotics_%26_IoT_Track-0A84FF?style=flat-square)](https://devpost.com)
+[![License: Apache-2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg?style=flat-square)](LICENSE)
+[![Platform: ESP8266](https://img.shields.io/badge/Platform-ESP8266EX_%7C_NodeMCU_V3-2D3748?style=flat-square)](https://www.espressif.com)
+[![Firmware: C++17](https://img.shields.io/badge/Firmware-Bare--Metal_C%2B%2B17-00599C?style=flat-square)](https://isocpp.org)
+[![Storage: LittleFS](https://img.shields.io/badge/Storage-LittleFS_On--Chip_Flash-FF6F00?style=flat-square)](https://github.com/earlephilhower/littlefs-project)
+[![UI: Zero-Cloud PWA](https://img.shields.io/badge/UI-Zero--Cloud_Offline_PWA-10B981?style=flat-square)](data/)
+[![BOM Cost](https://img.shields.io/badge/BOM_Cost-~₹2%2C000_INR_(~$24_USD)-8B5CF6?style=flat-square)](#bill-of-materials--hardware-budget)
 
 ---
 
-## Key Features
+## Technical Specifications at a Glance
 
-- **Orthogonal Dual-Sensing**: Combines AC-pulsed electrical conductivity measurement with an optical transmission and refraction interface to distinguish water ingress from varying ethanol concentrations without ambiguity.
-- **Electrolysis-Free Sensing Circuit**: Driven by pulsed high-speed excitation to eliminate DC galvanic erosion and probe plating over prolonged immersion cycles.
-- **Deterministic 8-State Finite State Machine**: Bare-metal, non-blocking cooperative multitasking architecture ensuring predictable real-time execution.
-- **Embedded Web Console & PWA**: Served entirely from on-chip LittleFS flash storage with zero external cloud dependencies. Features offline caching, responsive controls, and custom SVG interface elements.
-- **Dual-Stage Actuation**: Optocoupled outputs for driving an active sump scavenge pump and chemical stabilizer micro-dosing mechanism.
-- **In-Situ Calibration Engine**: Multi-point piecewise interpolation stored directly to non-volatile JSON configuration files on flash.
+| Parameter | Value | Engineering Context |
+|:---|:---|:---|
+| **Core Microcontroller** | 32-bit Tensilica L106 @ 80/160 MHz | Espressif ESP8266EX (NodeMCU V3) |
+| **Detection Latency** | < 850 milliseconds | Sampling-to-state-transition threshold |
+| **Excitation Modality** | 10 Hz Pulsed AC, 500 µs pulse width | Anti-electrolysis bipolar zero-plating design |
+| **Optical Stage** | 940 nm Narrow-Beam IR + CdS Sensor | Resolves refractive index differences (1.33 vs 1.42) |
+| **Primary Actuator** | 12V Diaphragm Pump (4.0 L/min) | Optocoupled scavenge purge for tank sump |
+| **Secondary Actuator** | 12V Peristaltic Pump (120 mL/min) | Micro-dosing for chemical co-solvent remediation |
+| **Local Display** | 1.3-inch 128x64 Monochrome OLED | 4-Wire Software SPI (SH1106 controller) |
+| **Wireless Interface** | IEEE 802.11 b/g/n Wi-Fi SoftAP | Standalone local network (`FuelGuard` / WPA2-PSK) |
+| **Web Server & UI** | Embedded LittleFS PWA Engine | Zero-cloud, local REST API + dynamic SVG oscilloscope |
+| **Total Hardware Cost** | ~₹2,000 INR (~$24 USD) | Accessible, modular commercialization model |
+
+---
+
+## The Physical Problem
+
+Global fuel standards increasingly mandate ethanol blending (E10, E20). While environmentally advantageous, ethanol is chemically hygroscopic: it scavenges ambient humidity from vented vehicular fuel tanks and storage cisterns.
+
+When dissolved moisture exceeds the thermodynamic **Water Tolerance Limit (WTL)** (typically 0.4%–0.6% v/v depending on ambient temperature), the fuel undergoes macroscopic liquid-liquid phase separation:
+1. **Upper Layer**: Octane-depleted gasoline fraction.
+2. **Bottom Layer**: Dense, corrosive ethanol-water mixture that stratifies directly into the fuel pickup sump.
+
+```
++---------------------------------------------------+
+|               VENTED VEHICLE FUEL TANK            |
+|                                                   |
+|  [ Gasoline Hydrocarbon Layer - Octane Depleted ] |
+|  Density: ~0.72 - 0.75 g/cm3                      |
+|                                                   |
+|~~~~~~~~~~~~~~~~ Phase Boundary ~~~~~~~~~~~~~~~~~~~|
+|  [ Corrosive Water-Ethanol Phase Separation Slug ]|
+|  Density: ~0.85 - 0.92 g/cm3                      |
+|  +--------------------+   +--------------------+  |
+|  | Conductivity Probe |   | Optical Refraction |  |
+|  | A0 Sensing Point   |   | GPIO13 Threshold   |  |
+|  +--------------------+   +--------------------+  |
+|               |                     |             |
+|   ============v=====================v===========  |
+|  [ Sump Suction Pickup -> Engine Injection Pump ] |
++---------------------------------------------------+
+```
+
+### Why Existing Solutions Fail
+* **Single Capacitive Sensors**: Suffer from mathematical ambiguity. Uncontaminated E25 fuel exhibits nearly the same dielectric constant ($\epsilon_r \approx 5.5\text{--}6.0$) as moisture-contaminated E10 fuel. A single capacitive transducer cannot reliably differentiate phase separation from higher legitimate ethanol content.
+* **Laboratory Instrumentation (Karl Fischer Titration, GC)**: Highly accurate, but requires benchtop laboratory equipment costing over ₹10,00,000, rendering real-time, in-tank vehicular deployment impossible.
+
+**FuelGuard** solves this by coupling an **orthogonal dual-sensing model** (pulsed electrical conductivity + optical transmission/refraction) with an **autonomous closed-loop purge mechanism**.
+
+---
+
+## Dual-Transducer Physical Sensing Principle
+
+```mermaid
+graph TD
+    A[Raw Tank Fuel Stratum] --> B[Orthogonal Sensing Stage]
+    B -->|Pulsed 10 Hz AC Excitation| C[Conductivity Transducer Pin A0]
+    B -->|940nm IR Beam Refraction| D[Optical Detector Pin GPIO13]
+    C -->|Analog Volumetric Ionic Density| E{Dual-Validation Decision Matrix}
+    D -->|Digital Optical Boundary State| E
+    E -->|Both Indicate Stratification| F[Trigger 8-State FSM State Change]
+    E -->|Single Anomaly Detected| G[Filter Noise / False Positive Suppression]
+    F --> H[Engage Closed-Loop Scavenge Purge & Remediation]
+```
+
+### 1. Pulsed AC Anti-Electrolysis Conductivity Transducer
+Direct current (DC) passing through ethanol-water solutions causes rapid electrolytic plating, galvanic probe erosion, and hydrogen bubble formation within hours. 
+* FuelGuard drives an NPN BJT switch connected to GPIO12 (`EXCITE`) that pulses the 316L stainless-steel electrodes for only **500 microseconds** per 10 Hz reading cycle.
+* Probe voltage is sampled on analog pin `A0` (10-bit SAR ADC, 0–1023) through a high-precision voltage divider, ensuring negligible net charge transfer and zero galvanic degradation over prolonged immersion.
+
+### 2. Optical Transmission and Refraction Interface
+Ethanol-gasoline blends and aqueous slugs exhibit distinct refractive indices ($n \approx 1.42$ for gasoline vs $n \approx 1.33$ for the aqueous layer).
+* A 940 nm narrow-beam infrared emitter shines through an optical sampling gap onto a CdS photoconductive sensor tied to GPIO13.
+* When the aqueous boundary reaches the sensor plane, altered internal reflection and beam scattering instantly shift the digital logic level, confirming macroscopic separation without relying solely on conductivity.
 
 ---
 
@@ -41,8 +103,8 @@ If ingested by the high-pressure fuel delivery pump, this aqueous layer causes i
           |                            |                            |
           v                            v                            v
 +--------------------+       +--------------------+       +--------------------+
-|  Pulsed AC Sensing |       | Optical Refraction |       |  I2C / SPI Display |
-|  Transducer (A0)   |       | Interface (GPIO13) |       |  SH1106 128x64 OLED|
+| Pulsed AC Sensing  |       | Optical Refraction |       |  I2C / SPI Display |
+| Transducer (A0)    |       | Interface (GPIO13) |       |  SH1106 128x64 OLED|
 +--------------------+       +--------------------+       +--------------------+
           |                            |
           +--------------+-------------+
@@ -58,160 +120,162 @@ If ingested by the high-pressure fuel delivery pump, this aqueous layer causes i
           v                            v
 +--------------------+       +--------------------+
 | Sump Purge Relay   |       | Dosing Pump Relay  |
-| GPIO16 (Scavenge)  |       | GPIO2 (Stabilizer) |
+| GPIO16 (R1 Purge)  |       | GPIO2 (R2 Dose)    |
 +--------------------+       +--------------------+
+          |                            |
+          v                            v
+[12V Scavenge Diaphragm Pump]  [12V Peristaltic Dosing Pump]
 ```
 
 ---
 
-## Hardware Pinout & Peripherals
+## Hardware Pinout & GPIO Mapping
 
-The table below describes the pin mappings and hardware assignments configured in firmware for the ESP8266 NodeMCU V3 platform:
-
-| Pin / GPIO | Hardware Identifier | Peripheral Function | Electrical Specification |
+| Pin Name | NodeMCU Label | Peripheral Function | Electrical Characteristics |
 |:---|:---|:---|:---|
-| **A0 (TOUT)** | Analog Channel 0 | Conductivity Sensing Return | 0.0V - 1.0V (0 - 1023 ADC SAR input) |
-| **GPIO12 (D6)** | EXCITE | AC Pulse Excitation Drive | 3.3V Logic, High-Speed Pulsed Signal |
-| **GPIO13 (D7)** | LDR | Optical Detector Interface | Digital input from phototransistor / CdS stage |
-| **GPIO16 (D0)** | R1 | Scavenge Purge Pump Relay | Active-low optocoupler input (12V diaphragm pump) |
-| **GPIO2 (D4)** | R2 | Chemical Dosing Pump Relay | Active-low optocoupler input (Peristaltic pump) |
-| **GPIO4 (D2)** | RED | Fault / Warning Status LED | 3.3V logic drive via current-limiting resistor |
-| **GPIO5 (D1)** | GREEN | Operational Status LED | 3.3V logic drive via current-limiting resistor |
-| **GPIO14 (D5)**| BUZZER | Acoustic Alert Output | Active piezo alarm transducer |
-| **GPIO15 (D8)**| OLED_CS / CLK | SH1106 Graphic Display | 4-Wire Software SPI Clock Line |
-| **GPIO0 (D3)** | OLED_MOSI | SH1106 Data Line | Software SPI Master-Out Slave-In |
-| **TX (GPIO1)** | OLED_DC | SH1106 Command/Data Select | Dedicated display control line (Serial disabled) |
+| **A0 (TOUT)** | A0 | Analog Sensor Return | 0.0V–1.0V (10-bit SAR ADC input) |
+| **GPIO12** | D6 | AC Pulse Drive (`EXCITE`) | 3.3V Logic, High-Speed Low-Duty-Cycle Pulse |
+| **GPIO13** | D7 | Optical Refraction Detector (`LDR`) | Digital Input (Internal Pull-Up enabled) |
+| **GPIO16** | D0 | Scavenge Purge Pump Relay (`R1`) | Active-Low Optocoupler Drive (12V Diaphragm Pump) |
+| **GPIO2** | D4 | Chemical Dosing Pump Relay (`R2`) | Active-Low Optocoupler Drive (Peristaltic Dosing) |
+| **GPIO4** | D2 | Alert / Fault LED (`RED`) | 3.3V Output via 330Ω Current-Limiting Resistor |
+| **GPIO5** | D1 | Nominal Status LED (`GREEN`) | 3.3V Output via 330Ω Current-Limiting Resistor |
+| **GPIO14** | D5 | Acoustic Alarm (`BUZZER`) | Active Piezo Transducer Drive |
+| **GPIO15** | D8 | OLED Clock (`OLED_CS / CLK`) | 4-Wire Software SPI Clock Line |
+| **GPIO0** | D3 | OLED Data (`OLED_MOSI`) | 4-Wire Software SPI Master-Out Slave-In |
+| **TX (GPIO1)** | TX | OLED Command/Data (`OLED_DC`) | Dedicated Display Control Line (Hardware Serial Disabled) |
 
 ---
 
-## Finite State Machine (FSM)
+## Deterministic 8-State Finite State Machine (FSM)
 
-The core control firmware operates a non-blocking 8-state cooperative state machine:
-
+```mermaid
+stateDiagram-v2
+    [*] --> WELCOME
+    WELCOME --> EMPTY: Hardware OK / No Fluid Detected
+    WELCOME --> FAULT: Hardware Self-Test Failure
+    EMPTY --> MONITOR: Fluid Immersed (A0 > SAMPLE_MIN)
+    MONITOR --> EMPTY: Probe De-wetted (A0 < SAMPLE_MIN)
+    MONITOR --> COUNTDOWN: Threshold Violation (A0 >= HIGH_LIMIT)
+    COUNTDOWN --> MONITOR: Transient False Positive (A0 < HIGH_LIMIT)
+    COUNTDOWN --> FLUSHING: Confirmation Timer Elapsed
+    FLUSHING --> FLUSH_DONE: Contamination Cleared
+    FLUSHING --> FAULT: Runtime Exceeded Max Lease (30s)
+    FLUSH_DONE --> MONITOR: Sump Purge Completed
+    MONITOR --> STOPPED: Manual Override / Emergency Stop
+    FLUSHING --> STOPPED: Manual Emergency Stop
+    STOPPED --> MONITOR: Authenticated Reset Command
+    FAULT --> [*]
 ```
-[WELCOME] ---> [EMPTY] ---> [MONITOR] <--------------------+
-                  |             |                           |
-                  v             v (Phase Separation)        |
-               [FAULT]     [COUNTDOWN]                      |
-                                |                           |
-                                v (Timer Elapsed)           |
-                            [FLUSHING]                      |
-                                |                           |
-                                v (Threshold Clear)         |
-                           [FLUSH_DONE] --------------------+
-                                |
-                                v (Manual Stop / E-Stop)
-                            [STOPPED]
-```
 
-### State Definitions
+### State Behavior Matrix
 
-1. **WELCOME**: Power-on initialization state; executes hardware selftests, mounts LittleFS, initializes display drivers, and configures Wi-Fi SoftAP.
-2. **EMPTY**: Active when probes detect no fluid presence (open circuit). Relays remain locked out.
-3. **MONITOR**: Normal operating state. Executes alternating periodic sensing cycles, calculates smoothed metrics, and compares values against calibrated limits.
-4. **COUNTDOWN**: Triggered upon threshold violation. Provides a safety confirmation delay to prevent transient false-positive trips.
-5. **FLUSHING**: Closes the primary scavenge relay (R1) to evacuate contaminated bottom-settled fluid from the sump collector.
-6. **FLUSH_DONE**: Post-purge verification cycle. Confirms return to nominal fluid purity before disengaging active remediation.
-7. **STOPPED**: Manual override state entered via physical stop button or authenticated API command.
-8. **FAULT**: System protective lockout triggered if sensor signals exceed electrical safety limits or pump lease times expire.
-
----
-
-## RESTful Web API
-
-The onboard HTTP daemon provides a JSON-based control and telemetry API accessible via the local access point network:
-
-| Endpoint | Method | Authentication | Description |
+| State | OLED Display | Relays Active | Safety Invariant |
 |:---|:---|:---|:---|
-| `/api/status` | `GET` | Public | Returns real-time telemetry, state machine status, and raw sensor readings. |
-| `/api/logs` | `GET` | Public | Retrieves recent circular buffer log entries and transition timestamps. |
-| `/api/calibration` | `GET` | Public | Retrieves stored calibration data points and polynomial coefficients. |
-| `/api/login` | `POST` | Public | Authenticates admin session tokens for control and calibration overrides. |
-| `/api/mode` | `POST` | Authenticated | Toggles system between Autonomous and Manual intervention modes. |
-| `/api/pump` | `POST` | Authenticated | Manually triggers the scavenge purge pump with a bounded lease timeout. |
-| `/api/booster` | `POST` | Authenticated | Dispatches a micro-dose cycle via the chemical dosing peristaltic pump. |
-| `/api/stop` | `POST` | Public | Immediate emergency stop; de-energizes all relays and latches `STOPPED`. |
-| `/api/heartbeat` | `POST` | Authenticated | Extends safety operational lease during active client web connection. |
-| `/api/calibration` | `POST` | Authenticated | Captures current sensor voltage as a named reference blend calibration point. |
+| `WELCOME` | Boot Splash, QR Code | None | Mount LittleFS, verify configuration JSON |
+| `EMPTY` | "Tank Sump Empty" | None | Probes dry ($A_0 < 50$); actuators locked out |
+| `MONITOR` | Live Sensor Waveform, Blending Metric | None | Sampling at 10 Hz; smoothing filters active |
+| `COUNTDOWN` | Warning Screen, Countdown Timer | None | Hysteresis verification window (prevents splash false trips) |
+| `FLUSHING` | "PURGING CONTAMINATED SLUG" | R1 (Purge Pump) | Maximum continuous runtime bounded to 30,000 ms |
+| `FLUSH_DONE` | Verification Confirmation | None | 5-second stabilization post-scavenge |
+| `STOPPED` | "EMERGENCY STOP / MANUAL" | None | Actuators force-de-energized; requires authenticated release |
+| `FAULT` | Error Diagnostic Code, Audio Chirp | None | Lockout on probe short, open sensor, or lease overrun |
 
 ---
 
-## Local Web Application
+## Embedded Progressive Web Application (PWA)
 
-The system hosts an onboard Progressive Web Application served directly from embedded LittleFS flash:
+FuelGuard embeds an offline-first, client-rendered web application directly into the ESP8266's on-chip SPI flash:
 
-- **Offline-First PWA**: Fully functional without internet connectivity via modern browser caching (`sw.js`).
-- **Telemetry Visualizer**: Dynamic live-updating chart rendering electrical conductivity curves and trigger points.
-- **Diagnostic Controls**: Manual override toggles, dosing triggers, and audit logging.
-- **Calibration Wizard**: Interactive zero-point and span calibration directly from mobile or desktop browsers.
-- **Access Details**:
-  - Default SSID: `FuelGuard`
-  - Default Password: `fuelguard123`
-  - Local Hostname: `http://fuelguard.local` or `http://192.168.4.1`
+* **Zero Cloud Dependency**: Entirely self-hosted via `LittleFS`. No AWS, no Firebase, and no internet connection required.
+* **Offline-First Caching**: Implemented with a standards-compliant Service Worker (`data/sw.js`) and Web Manifest (`data/manifest.webmanifest`).
+* **Clean SVG UI**: Strict neo-brutalist industrial theme with zero emojis, crisp custom SVGs, and high readability in bright daylight or dark garage environments.
+* **Real-Time Oscilloscope**: Pure JavaScript dual-trace canvas renderer displaying live conductivity curves against dynamic trigger thresholds.
+* **Client-Side PDF Inspection Certificates**: Powered by embedded `jspdf` (`data/vendor/jspdf.umd.min.js`), generating compliance reports directly in the user's mobile browser.
 
----
-
-## Repository Structure
-
-```
-FuelGuard_final/
-├── FuelGuard_final.ino    # Main firmware source (C++, state machine, HTTP handlers)
-├── wifi_qr.h             # Monochrome QR bitmap matrix for Wi-Fi onboarding
-├── push_in_intervals.ps1 # Automation script for periodic updates
-├── data/                 # LittleFS root asset directory
-│   ├── index.html        # Single-page web dashboard application
-│   ├── app.js            # PWA logic, live chart engine, and REST client
-│   ├── sw.js             # Service Worker for local resource caching
-│   └── manifest.webmanifest # PWA install metadata and vector icon manifests
-└── README.md             # Project documentation
-```
+### Accessing the Web Console
+1. Power up the hardware rig. The SH1106 OLED automatically generates a scannable Wi-Fi QR code.
+2. Connect to the device Wi-Fi:
+   * **SSID**: `FuelGuard`
+   * **Password**: `fuelguard123`
+3. Open any modern browser and navigate to:
+   * `http://fuelguard.local` or `http://192.168.4.1`
 
 ---
 
-## Setup & Compilation
+## RESTful Web API Reference
 
-### Requirements
-- **Arduino IDE** (version 2.0+ recommended) or **Arduino CLI**.
-- **ESP8266 Board Package**: version `3.1.2` or later.
-- Required Libraries:
-  - `ArduinoJson` (v6.21.5)
-  - `U8g2` (latest release)
-  - `ESP8266WiFi`, `ESP8266WebServer`, `LittleFS`, `Ticker` (included in core)
+The onboard HTTP server exposes a JSON REST API for telemetry integration and supervisory control:
 
-### Board Configuration Settings
-- **Board**: `NodeMCU 1.0 (ESP-12E Module)`
-- **CPU Frequency**: `80 MHz` (or `160 MHz` for faster rendering)
-- **Flash Size**: `4MB (FS: 2MB)` or `4MB (FS: 3MB)`
-- **Upload Speed**: `921600` or `115200`
-- **Erase Flash**: `Only Sketch` (or `All Flash Contents` during initial setup)
-
-### Flashing Steps
-1. Open `FuelGuard_final.ino` in Arduino IDE.
-2. Verify board package settings match the specifications above.
-3. Upload the LittleFS filesystem image using the **ESP8266 LittleFS Data Upload** tool to transfer files from the `data/` folder.
-4. Compile and flash the sketch to the target microcontroller over USB.
+| Endpoint | Method | Auth Required | Purpose / Payload |
+|:---|:---|:---|:---|
+| `/api/status` | `GET` | No | Full telemetry: state, ADC reading, thresholds, relay states, uptime |
+| `/api/logs` | `GET` | No | Circular buffer of recent state transitions with millisecond timestamps |
+| `/api/calibration` | `GET` | No | Current reference calibration points and polynomial curve factors |
+| `/api/login` | `POST` | No | Authenticate session token using device password |
+| `/api/mode` | `POST` | Yes | Switch operating mode: `{"mode": "auto"}` or `{"mode": "manual"}` |
+| `/api/pump` | `POST` | Yes | Trigger manual scavenge purge cycle: `{"duration": 3000}` |
+| `/api/booster` | `POST` | Yes | Dispatch chemical stabilizer micro-dose: `{"dose_ms": 1500}` |
+| `/api/stop` | `POST` | No | Immediate Emergency Stop (kills all relays, latches `STOPPED`) |
+| `/api/heartbeat` | `POST` | Yes | Refresh safety lease timer during manual override sessions |
+| `/api/calibration` | `POST` | Yes | Capture active voltage as a named calibration point (e.g., E10, E20) |
+| `/api/calibration/cancel` | `POST` | Yes | Abort an in-progress multi-point calibration capture |
+| `/api/calibration/delete` | `POST` | Yes | Reset stored calibration to factory firmware defaults |
 
 ---
 
-## Technical Specifications
+## Bill of Materials & Hardware Budget
 
-| Parameter | Specification |
-|:---|:---|
-| Microcontroller | Espressif ESP8266EX (32-bit RISC @ 80/160 MHz) |
-| Supply Input | 12V DC (automotive battery bus) with on-board buck conversion to 5V / 3.3V |
-| Idle Power Draw | Under 120 mA @ 12V DC |
-| Scavenge Pump Output | Up to 4.0 L/min open flow (Viton diaphragm assembly) |
-| Sensing Frequency | 10 Hz AC pulse interrogation |
-| Sampling Latency | Less than 850 milliseconds to state transition |
-| Optical Spectrum | 940 nm narrow-beam infrared emitter with matching photo-detector |
-| Local Interface | 1.3-inch 128x64 monochrome OLED (SH1106 controller) |
-| Network Mode | IEEE 802.11 b/g/n Wi-Fi SoftAP with WPA2-PSK |
+Strict cost discipline is maintained to ensure economic feasibility for fleet retrofits:
+
+| Component | Key Specifications | Qty | Unit Cost (INR) | Subtotal (INR) |
+|:---|:---|:---:|:---:|:---:|
+| **ESP8266EX NodeMCU V3** | 32-bit Tensilica L106, 4MB Flash, Wi-Fi | 1 | ₹320 | ₹320 |
+| **1.3" SH1106 OLED Display** | 128x64 Monochrome Graphic Screen, 4-Wire SPI | 1 | ₹280 | ₹280 |
+| **Dual 5V Relay Module** | PC817 Optocoupled Isolation, 10A 250VAC Contacts | 1 | ₹150 | ₹150 |
+| **316L Stainless Steel Probes** | Dual Acid-Resistant Sensing Electrodes | 2 | ₹50 | ₹100 |
+| **Optical Stage (IR + CdS)** | 940 nm Narrow-Beam Emitter + 5528 Photocell | 1 | ₹50 | ₹50 |
+| **LM2596S DC-DC Step-Down** | 9V–35V Input, 5V 3A Output Buck Converter | 1 | ₹100 | ₹100 |
+| **12V Scavenge Diaphragm Pump** | Self-Priming 4.0 L/min, Viton Diaphragm Assembly | 1 | ₹650 | ₹650 |
+| **12V Peristaltic Dosing Pump** | Fuel-Grade Silicone Tube, 120 mL/min Output | 1 | ₹200 | ₹200 |
+| **Passives, Enclosure & PCB** | TVS diode, 1% resistors, caps, buzzer, FR4 | 1 | ₹150 | ₹150 |
+| **TOTAL PROTOTYPE BOM** | **Complete Hardware Procurement Budget** | — | — | **₹2,000** |
+
+---
+
+## Flashing & Setup Guide
+
+### 1. Development Prerequisites
+* **Arduino IDE** (version 2.0+ recommended) or **Arduino CLI**.
+* **ESP8266 Board Package**: version `3.1.2` or later.
+* Required Libraries (install via Arduino Library Manager):
+  * `ArduinoJson` (v6.21.5)
+  * `U8g2` (v2.34+ by olikraus)
+  * `ESP8266WiFi`, `ESP8266WebServer`, `LittleFS`, `Ticker` (bundled with ESP8266 core)
+
+### 2. Board Configuration Settings
+In the Arduino IDE **Tools** menu, select:
+* **Board**: `NodeMCU 1.0 (ESP-12E Module)`
+* **CPU Frequency**: `80 MHz` (or `160 MHz` for faster web rendering)
+* **Flash Size**: `4MB (FS: 2MB OTA:~1019KB)` or `4MB (FS: 3MB)`
+* **Upload Speed**: `921600` (or `115200` if serial connection is unstable)
+
+### 3. Step-by-Step Build Steps
+1. Clone this repository:
+   ```bash
+   git clone https://github.com/RizzWan-Codes/FuelGuard.git
+   cd FuelGuard
+   ```
+2. Open `FuelGuard_final.ino` in the Arduino IDE.
+3. Upload the LittleFS filesystem image using the **ESP8266 LittleFS Data Upload** tool to write the `data/` assets to flash.
+4. Compile and flash the sketch to the ESP8266 over USB.
+5. The SH1106 OLED will boot into the splash sequence and display the scannable Wi-Fi onboarding QR code.
 
 ---
 
 ## Safety & Operational Disclaimer
 
-This project is a functional engineering prototype and bench demonstration system. While designed around low-voltage sensing and isolated relay control, installation in real vehicular fuel tanks requires certified explosion-proof enclosures, intrinsically safe galvanic barriers (e.g., ATEX / IECEx Zone 0 compliance), and fuel-rated materials certified against aggressive ethanol corrosion.
+FuelGuard is an engineering prototype and bench demonstration platform. While low-voltage pulse excitation and optocoupled relay isolation are implemented throughout the electrical design, deploying sensing instrumentation inside production vehicle fuel systems requires certified explosion-proof enclosures, intrinsically safe Zener barrier isolation (e.g., ATEX / IECEx Zone 0 compliance), and specialized materials certified against ethanol chemical corrosion.
 
 ---
 
