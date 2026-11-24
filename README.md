@@ -67,16 +67,38 @@ When dissolved moisture exceeds the thermodynamic **Water Tolerance Limit (WTL)*
 
 ## Dual-Transducer Physical Sensing Principle
 
-```mermaid
-graph TD
-    A[Raw Tank Fuel Stratum] --> B[Orthogonal Sensing Stage]
-    B -->|Pulsed 10 Hz AC Excitation| C[Conductivity Transducer Pin A0]
-    B -->|940nm IR Beam Refraction| D[Optical Detector Pin GPIO13]
-    C -->|Analog Volumetric Ionic Density| E{Dual-Validation Decision Matrix}
-    D -->|Digital Optical Boundary State| E
-    E -->|Both Indicate Stratification| F[Trigger 8-State FSM State Change]
-    E -->|Single Anomaly Detected| G[Filter Noise / False Positive Suppression]
-    F --> H[Engage Closed-Loop Scavenge Purge & Remediation]
+```
++-----------------------------------------------------------------+
+|                    RAW TANK FUEL STRATUM                        |
++-----------------------------------------------------------------+
+                                |
+                                v
+               +---------------------------------+
+               |    Orthogonal Sensing Stage     |
+               +----------------+----------------+
+                                |
+        +-----------------------+-----------------------+
+        |                                               |
+        v [Pulsed 10 Hz AC]                             v [940nm IR Refraction]
++-------------------------------+               +-------------------------------+
+| Conductivity Transducer (A0)  |               | Optical Detector (GPIO13)     |
+| Analog Volumetric Density     |               | Digital Interface State       |
++---------------+---------------+               +---------------+---------------+
+        |                                               |
+        +-----------------------+-----------------------+
+                                |
+                                v
+               +---------------------------------+
+               | Dual-Validation Decision Engine |
+               +----------------+----------------+
+                                |
+        +-----------------------+-----------------------+
+        | Both Confirm                                  | Single Anomaly
+        v Stratification                                v Detected
++-------------------------------+               +-------------------------------+
+| Trigger 8-State FSM Change    |               | Suppress Noise / False Alarm  |
+| Engage Scavenge Purge & Dose  |               | Maintain Normal Monitor State |
++-------------------------------+               +-------------------------------+
 ```
 
 ### 1. Pulsed AC Anti-Electrolysis Conductivity Transducer
@@ -149,23 +171,40 @@ Ethanol-gasoline blends and aqueous slugs exhibit distinct refractive indices ($
 
 ## Deterministic 8-State Finite State Machine (FSM)
 
-```mermaid
-stateDiagram-v2
-    [*] --> WELCOME
-    WELCOME --> EMPTY: Hardware OK / No Fluid Detected
-    WELCOME --> FAULT: Hardware Self-Test Failure
-    EMPTY --> MONITOR: Fluid Immersed (A0 > SAMPLE_MIN)
-    MONITOR --> EMPTY: Probe De-wetted (A0 < SAMPLE_MIN)
-    MONITOR --> COUNTDOWN: Threshold Violation (A0 >= HIGH_LIMIT)
-    COUNTDOWN --> MONITOR: Transient False Positive (A0 < HIGH_LIMIT)
-    COUNTDOWN --> FLUSHING: Confirmation Timer Elapsed
-    FLUSHING --> FLUSH_DONE: Contamination Cleared
-    FLUSHING --> FAULT: Runtime Exceeded Max Lease (30s)
-    FLUSH_DONE --> MONITOR: Sump Purge Completed
-    MONITOR --> STOPPED: Manual Override / Emergency Stop
-    FLUSHING --> STOPPED: Manual Emergency Stop
-    STOPPED --> MONITOR: Authenticated Reset Command
-    FAULT --> [*]
+```
+               +-------------------+
+               |      WELCOME      |
+               +---------+---------+
+                         |
+                         v (Hardware Self-Test OK)
+               +-------------------+
+        +----->|       EMPTY       |<----------------+
+        |      +---------+---------+                 |
+        |                |                           |
+        |                v (Fluid Immersed: A0 >= 50)|
+        |      +-------------------+                 |
+        |      |      MONITOR      |                 |
+        |      +---------+---------+                 |
+        |                |                           |
+(Probes |                v (Conductivity >= Limit)   | (Probes
+ De-wetted)    +-------------------+                 |  De-wetted)
+        |      |     COUNTDOWN     |                 |
+        |      +---------+---------+                 |
+        |                |                           |
+        |                v (Timer Elapsed: 3000 ms)  |
+        |      +-------------------+                 |
+        |      |     FLUSHING      |                 |
+        |      +---------+---------+                 |
+        |                |                           |
+        |                v (Sump Purged Clear)       |
+        |      +-------------------+                 |
+        +------+    FLUSH_DONE     +-----------------+
+               +-------------------+
+                         |
+                         v (Manual Stop / E-Stop)
+               +-------------------+
+               |      STOPPED      |
+               +-------------------+
 ```
 
 ### State Behavior Matrix
